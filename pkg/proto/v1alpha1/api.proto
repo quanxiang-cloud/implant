@@ -1,0 +1,57 @@
+syntax = "proto3";
+package v1alpha1;
+
+message CreateReq{
+	ObjectMeta objectMeta = 1;
+	Status state = 2;
+}
+
+message ObjectMeta{
+	string name  = 1;
+	string namepsace  = 2;
+	string uid  = 3;
+	string creationTime = 4;
+	map<string,string> labels  = 5;
+	repeated OwnerReference ownerReference = 6;
+}
+
+message OwnerReference{
+	string name = 1;
+	string uid = 2;
+}
+
+message Status{
+	Condition conditions = 1;
+}
+
+message Condition{
+	string status = 1;
+	string reason = 2;
+	string message = 3;
+	map<string,StepCondition> resourceRef = 4;
+	string lastTransitionTime = 5;
+}
+
+message StepCondition{
+	string state = 1;
+	string reason = 2;
+	string message = 3;
+}
+
+message UpdateReq{
+	ObjectMeta objectMeta = 1;
+	Status state = 2;
+}
+
+message DeleteReq{
+	ObjectMeta objectMeta = 1;
+	Status state = 2;
+}
+
+message Resp{}
+
+service Implant{
+	rpc Create(CreateReq)returns(Resp);
+	rpc Update(UpdateReq)returns(Resp);
+	rpc Delete(DeleteReq)returns(Resp);
+}
