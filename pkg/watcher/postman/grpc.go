@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/quanxiang-cloud/implant/pkg/proto/v1alpha1"
 	pb "github.com/quanxiang-cloud/implant/pkg/proto/v1alpha1"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	"google.golang.org/grpc"
@@ -92,23 +93,30 @@ func serializeObj(sm reconciler.StatusSummary) (pb.ObjectMeta, pb.Status) {
 			})
 	}
 
-	condition := &pb.Condition{
-		Status:             string(sm.Status.Condition.Status),
-		Reason:             sm.Status.Condition.Reason,
-		Message:            sm.Status.Condition.Message,
-		ResourceRef:        make(map[string]*pb.StepCondition, len(sm.Status.Condition.ResourceRef)),
-		LastTransitionTime: sm.Status.Condition.LastTransitionTime.String(),
-	}
+	resourceRef := make(map[string]*v1alpha1.RefCondition)
+	for key, ref := range sm.Status.ResourceRef {
+		conditions := make([]*v1alpha1.Condition, 0, len(ref.Conditions))
+		for _, elem := range ref.Conditions {
+			conditions = append(conditions, &v1alpha1.Condition{
+				Status:             string(elem.Status),
+				LastTransitionTime: elem.LastTransitionTime.String(),
+				Message:            elem.Message,
+				Reason:             elem.Reason,
+			})
+		}
 
-	for key, sc := range sm.Status.Condition.ResourceRef {
-		condition.ResourceRef[key] = &pb.StepCondition{
-			State:   string(sc.State),
-			Reason:  sc.Reason,
-			Message: sc.Message,
+		resourceRef[key] = &v1alpha1.RefCondition{
+			Name:       ref.Name,
+			Conditions: conditions,
 		}
 	}
 
 	return objectMeta, pb.Status{
-		Conditions: condition,
+		Phase:              sm.Status.Phase.Sting(),
+		Status:             string(sm.Status.Status),
+		Reason:             sm.Status.Reason,
+		Message:            sm.Status.Message,
+		ResourceRef:        resourceRef,
+		LastTransitionTime: sm.Status.LastTransitionTime.String(),
 	}
 }

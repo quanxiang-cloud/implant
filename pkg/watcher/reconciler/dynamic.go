@@ -63,7 +63,7 @@ func (i *Impl) getState(obj interface{}) (*StatusSummary, bool) {
 
 	return &StatusSummary{
 		ObjectMeta: osr.ObjectMeta,
-		Status:     osr.Status.Status,
+		Status:     osr.Status,
 	}, true
 }
 
@@ -84,5 +84,5 @@ type Object struct {
 
 type StatusSummary struct {
 	metav1.ObjectMeta
-	Status v1alpha1.Status
+	Status v1alpha1.OverseerRunStatus
 }
