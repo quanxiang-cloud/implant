@@ -21,21 +21,25 @@ message OwnerReference{
 }
 
 message Status{
-	Condition conditions = 1;
+	string phase  = 1;
+	string status = 2;
+	string reason = 3;
+	string message = 4;
+	map<string,RefCondition> resourceRef = 5;
+	string lastTransitionTime = 6;
+
+}
+
+message RefCondition{
+	string name = 1;
+	repeated Condition conditions = 2;
 }
 
 message Condition{
 	string status = 1;
 	string reason = 2;
 	string message = 3;
-	map<string,StepCondition> resourceRef = 4;
-	string lastTransitionTime = 5;
-}
-
-message StepCondition{
-	string state = 1;
-	string reason = 2;
-	string message = 3;
+    string lastTransitionTime = 4;
 }
 
 message UpdateReq{
