@@ -47,7 +47,7 @@ func main() {
 	flag.DurationVar(&retryPeriod, "retry", time.Duration(5)*time.Second, "")
 
 	flag.IntVar(&concurrency, "concurrency", 1, "")
-	flag.StringVar(&target, "target", "", "")
+	flag.StringVar(&target, "target", "localhost:8081", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -94,7 +94,8 @@ func MainWithClient(ctx context.Context, client *clientset.Clientset) {
 	cc := overseerrun.NewControllerWithConfig(ctx, client, defaultResync, opts...)
 	go cc.Run(ctx.Done())
 
-	<-errChan
+	err = <-errChan
+	klog.Error(err)
 }
 
 func HA(ctx context.Context, config *rest.Config, going chan<- struct{}) {

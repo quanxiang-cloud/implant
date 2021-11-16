@@ -8,6 +8,9 @@ import (
 	pb "github.com/quanxiang-cloud/implant/pkg/proto/v1alpha1"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	rs "google.golang.org/grpc/status"
+	"k8s.io/klog"
 )
 
 func New(ctx context.Context, target string) (*Sender, error) {
@@ -68,7 +71,14 @@ func (s *Sender) SendFN(e chan<- error) func(obj interface{}) {
 			})
 		}
 
-		if err != nil {
+		code := rs.Code(err)
+		switch code {
+		case codes.OK:
+			return
+		case codes.Unknown:
+			klog.Error(err)
+		default:
+			klog.Error(err)
 			e <- err
 		}
 	}
