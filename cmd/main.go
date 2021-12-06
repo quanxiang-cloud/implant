@@ -49,7 +49,7 @@ func main() {
 
 	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
-	flag.StringVar(&target, "target", "localhost:8083", "")
+	flag.StringVar(&target, "target", "localhost:8081", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -71,9 +71,9 @@ func main() {
 	}
 	ctx := context.Background()
 
-	// leader := make(chan struct{})
-	// go HA(ctx, config, leader)
-	// <-leader
+	leader := make(chan struct{})
+	go HA(ctx, config, leader)
+	<-leader
 	klog.Info("i am leader,working now")
 
 	MainWithClient(ctx, client)
