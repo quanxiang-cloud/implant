@@ -49,7 +49,7 @@ func main() {
 
 	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
-	flag.StringVar(&target, "target", "localhost:8081", "")
+	flag.StringVar(&target, "target", "localhost:8080", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -74,7 +74,7 @@ func main() {
 	leader := make(chan struct{})
 	go HA(ctx, config, leader)
 	<-leader
-	klog.Info("i am leader,working now")
+	klog.Info("i am leader")
 
 	MainWithClient(ctx, client)
 }
@@ -85,6 +85,7 @@ func MainWithClient(ctx context.Context, client *clientset.Clientset) {
 		klog.Error(err, "unable to get worker client")
 		os.Exit(1)
 	}
+	klog.Info("start working")
 
 	opts := make([]reconciler.Options, 0)
 	errChan := make(chan error)
