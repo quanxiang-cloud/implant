@@ -16,7 +16,7 @@ func NewController(ctx context.Context, client clientset.Interface, defaultResyn
 
 func NewControllerWithConfig(ctx context.Context, client clientset.Interface, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
 	informer := overseerInformers.New(informers.NewSharedInformerFactory(client, defaultResync), nil).
-		V1alpha1().OverseerRun().
+		V1alpha1().Overseer().
 		Informer()
 	return reconciler.NewControllerWithConfig(ctx, informer, opts...)
 }

@@ -104,7 +104,7 @@ func serializeObj(sm reconciler.StatusSummary) (pb.ObjectMeta, pb.Status) {
 	}
 
 	resourceRef := make(map[string]*v1alpha1.RefCondition)
-	for key, ref := range sm.Status.ResourceRef {
+	for _, ref := range sm.Status.VersatileStatus {
 		conditions := make([]*v1alpha1.Condition, 0, len(ref.Conditions))
 		for _, elem := range ref.Conditions {
 			conditions = append(conditions, &v1alpha1.Condition{
@@ -115,18 +115,15 @@ func serializeObj(sm reconciler.StatusSummary) (pb.ObjectMeta, pb.Status) {
 			})
 		}
 
-		resourceRef[key] = &v1alpha1.RefCondition{
-			Name:       ref.Name,
+		resourceRef[ref.Ref] = &v1alpha1.RefCondition{
+			Name:       ref.Ref,
 			Conditions: conditions,
 		}
 	}
 
 	return objectMeta, pb.Status{
-		Phase:              sm.Status.Phase.Sting(),
-		Status:             string(sm.Status.Status),
-		Reason:             sm.Status.Reason,
-		Message:            sm.Status.Message,
-		ResourceRef:        resourceRef,
-		LastTransitionTime: sm.Status.LastTransitionTime.String(),
+		Status:         string(sm.Status.Status),
+		ResourceRef:    resourceRef,
+		CompletionTime: sm.Status.CompletionTime.String(),
 	}
 }

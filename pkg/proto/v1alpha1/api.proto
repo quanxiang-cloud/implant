@@ -21,12 +21,9 @@ message OwnerReference{
 }
 
 message Status{
-	string phase  = 1;
-	string status = 2;
-	string reason = 3;
-	string message = 4;
-	map<string,RefCondition> resourceRef = 5;
-	string lastTransitionTime = 6;
+	string status = 1;
+	map<string,RefCondition> resourceRef = 2;
+	string completionTime = 3;
 
 }
 

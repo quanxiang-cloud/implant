@@ -33,6 +33,7 @@ var (
 	retryPeriod        time.Duration
 	concurrency        int
 	target             string
+	cacheMaxEntries    int
 )
 
 func main() {
@@ -46,8 +47,9 @@ func main() {
 	flag.DurationVar(&renewDeadline, "renew", time.Duration(15)*time.Second, "")
 	flag.DurationVar(&retryPeriod, "retry", time.Duration(5)*time.Second, "")
 
+	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
-	flag.StringVar(&target, "target", "localhost:8081", "")
+	flag.StringVar(&target, "target", "localhost:8083", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -69,10 +71,10 @@ func main() {
 	}
 	ctx := context.Background()
 
-	leader := make(chan struct{})
-	go HA(ctx, config, leader)
-	<-leader
-	klog.V(5).Info("i am leader,working now")
+	// leader := make(chan struct{})
+	// go HA(ctx, config, leader)
+	// <-leader
+	klog.Info("i am leader,working now")
 
 	MainWithClient(ctx, client)
 }
@@ -87,8 +89,12 @@ func MainWithClient(ctx context.Context, client *clientset.Clientset) {
 	opts := make([]reconciler.Options, 0)
 	errChan := make(chan error)
 	for i := 0; i < concurrency; i++ {
-		opts = append(opts, reconciler.WithConsumer(
-			ctx, worker.SendFN(errChan)),
+		opts = append(opts,
+			reconciler.WithConsumer(
+				ctx,
+				worker.SendFN(errChan),
+			),
+			reconciler.WithCache(ctx, cacheMaxEntries),
 		)
 	}
 	cc := overseerrun.NewControllerWithConfig(ctx, client, defaultResync, opts...)
