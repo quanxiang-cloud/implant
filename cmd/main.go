@@ -11,7 +11,7 @@ import (
 	"github.com/quanxiang-cloud/implant/pkg/watcher/overseerrun"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/postman"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
-	"github.com/quanxiang-cloud/overseer/pkg/client/clientset"
+	"github.com/quanxiang-cloud/overseer/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ct "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -25,6 +25,7 @@ import (
 var (
 	leaseLockName      string
 	leaseLockNamespace string
+	namespace          string
 	id                 string
 	defaultResync      time.Duration
 	releaseOnCancel    bool
@@ -40,6 +41,7 @@ func main() {
 	flag.StringVar(&id, "id", uuid.New().String(), "the holder identity name")
 	flag.StringVar(&leaseLockName, "lease-lock-name", "overseer", "the lease lock resource name")
 	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
+	flag.StringVar(&namespace, "namespace", "default", "")
 	flag.DurationVar(&defaultResync, "default-resync", time.Duration(30)*time.Second, "")
 
 	flag.BoolVar(&releaseOnCancel, "release-on-cancel", true, "")
@@ -64,7 +66,7 @@ func main() {
 	}
 
 	config := ctrl.GetConfigOrDie()
-	client, err := clientset.NewForConfig(config)
+	client, err := versioned.NewForConfig(config)
 	if err != nil {
 		klog.Error(err, "unable to get client set")
 		os.Exit(1)
@@ -79,7 +81,7 @@ func main() {
 	MainWithClient(ctx, client)
 }
 
-func MainWithClient(ctx context.Context, client *clientset.Clientset) {
+func MainWithClient(ctx context.Context, client *versioned.Clientset) {
 	worker, err := postman.New(ctx, target)
 	if err != nil {
 		klog.Error(err, "unable to get worker client")
@@ -98,7 +100,7 @@ func MainWithClient(ctx context.Context, client *clientset.Clientset) {
 			reconciler.WithCache(ctx, cacheMaxEntries),
 		)
 	}
-	cc := overseerrun.NewControllerWithConfig(ctx, client, defaultResync, opts...)
+	cc := overseerrun.NewControllerWithConfig(ctx, client, "", defaultResync, opts...)
 	go cc.Run(ctx.Done())
 
 	err = <-errChan

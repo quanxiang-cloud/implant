@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang/groupcache/lru"
 	hs "github.com/mitchellh/hashstructure/v2"
-	v1alpha1 "github.com/quanxiang-cloud/overseer/pkg/apis/v1alpha1"
+	v1alpha1 "github.com/quanxiang-cloud/overseer/pkg/apis/overseer/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
