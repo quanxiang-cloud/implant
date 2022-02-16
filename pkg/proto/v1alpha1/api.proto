@@ -24,7 +24,7 @@ message Status{
 	string status = 1;
 	map<string,RefCondition> resourceRef = 2;
 	string completionTime = 3;
-
+	PipelineRun pipelineRun = 4;
 }
 
 message RefCondition{
@@ -37,6 +37,25 @@ message Condition{
 	string reason = 2;
 	string message = 3;
     string lastTransitionTime = 4;
+}
+
+message PipelineRun{
+	string status = 1;
+	repeated TaskRun taskRun = 2;
+}
+
+message TaskRun{
+	string taskName = 1;
+	string status = 2;
+	string startTime = 3;
+	string completionTime = 4;
+	repeated Step step = 5;
+}
+
+message Step{
+	string name = 1;
+	string startTime = 2;
+	string completionTime = 3;
 }
 
 message UpdateReq{

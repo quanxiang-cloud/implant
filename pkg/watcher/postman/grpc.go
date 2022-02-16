@@ -29,7 +29,6 @@ func connet(ctx context.Context, target string) (pb.ImplantClient, error) {
 		grpc.WithInsecure(),
 		grpc.WithBlock(),
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +81,6 @@ func (s *Sender) SendFN(e chan<- error) func(obj interface{}) {
 			e <- err
 		}
 	}
-
 }
 
 func serializeObj(sm reconciler.StatusSummary) (pb.ObjectMeta, pb.Status) {
@@ -120,10 +118,36 @@ func serializeObj(sm reconciler.StatusSummary) (pb.ObjectMeta, pb.Status) {
 			Conditions: conditions,
 		}
 	}
+	pipelineRuns := &v1alpha1.PipelineRun{
+		Status: string(sm.Status.PipelineRuns.Status),
+	}
 
+	originTaskRun := sm.Status.PipelineRuns.TaskRuns
+	taskruns := make([]*v1alpha1.TaskRun, 0, len(originTaskRun))
+	for _, taskRun := range originTaskRun {
+		steps := make([]*v1alpha1.Step, 0, len(taskRun.Steps))
+		for _, step := range taskRun.Steps {
+			steps = append(steps, &v1alpha1.Step{
+				Name:           step.Name,
+				StartTime:      step.StartTime.String(),
+				CompletionTime: step.CompletionTime.String(),
+			})
+		}
+
+		taskruns = append(taskruns, &v1alpha1.TaskRun{
+			TaskName:       taskRun.Name,
+			Status:         string(taskRun.Status),
+			StartTime:      taskRun.StartTime.String(),
+			CompletionTime: taskRun.CompletionTime.String(),
+			Step:           steps,
+		})
+	}
+
+	pipelineRuns.TaskRun = append(pipelineRuns.TaskRun, taskruns...)
 	return objectMeta, pb.Status{
 		Status:         string(sm.Status.Status),
 		ResourceRef:    resourceRef,
 		CompletionTime: sm.Status.CompletionTime.String(),
+		PipelineRun:    pipelineRuns,
 	}
 }
