@@ -1,0 +1,31 @@
+apiVersion: core.openfunction.io/v1beta1
+kind: Function
+metadata:
+  creationTimestamp: "2022-04-18T06:03:09Z"
+  generation: 1
+  labels:
+    quanxiang.faas/group: OpenFunction
+    quanxiang.faas/id: ""
+    quanxiang.faas/project: samples
+    quanxiang.faas/tag: v1
+  name: openfunction-samples-v1
+  namespace: faas
+  resourceVersion: "23509708"
+  uid: 78aaab1a-108e-4686-ada1-ac42576a6f21
+spec:
+  build:
+    builder: openfunction/builder-go:latest
+    env:
+      FUNC_CLEAR_SOURCE: "true"
+      FUNC_NAME: HelloWorld
+      GOPROXY: https://goproxy.cn,direct
+    failedBuildsHistoryLimit: 3
+    srcRepo:
+      sourceSubPath: functions/knative/hello-world-go
+      url: https://github.com/OpenFunction/samples.git
+    successfulBuildsHistoryLimit: 2
+    timeout: 10m0s
+  image: qxcr.xyz/faas/openfunction-samples:v205
+  imageCredentials:
+    name: qxcr
+  version: v1

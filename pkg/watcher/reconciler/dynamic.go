@@ -5,10 +5,11 @@ import (
 
 	"github.com/golang/groupcache/lru"
 	hs "github.com/mitchellh/hashstructure/v2"
-	v1alpha1 "github.com/quanxiang-cloud/overseer/pkg/apis/overseer/v1alpha1"
+	v1beta1 "github.com/openfunction/apis/core/v1beta1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	klog "k8s.io/klog/v2"
 )
 
 func NewImpl(opts ...Options) *Impl {
@@ -87,14 +88,20 @@ func (i *Impl) post(method string, obj interface{}) {
 }
 
 func (i *Impl) getState(obj interface{}) (*StatusSummary, bool) {
-	osr, ok := obj.(*v1alpha1.Overseer)
+	// osr, ok := obj.(*v1alpha1.Overseer)
+	fn, ok := obj.(*v1beta1.Function)
 	if !ok {
 		return nil, false
 	}
 
+	if fn.Status.Build == nil {
+		return nil, false
+	}
+
 	return &StatusSummary{
-		ObjectMeta: osr.ObjectMeta,
-		Status:     osr.Status,
+		// TODO:
+		ObjectMeta: fn.ObjectMeta,
+		Status:     fn.Status,
 	}, true
 }
 
@@ -115,5 +122,5 @@ type Object struct {
 
 type StatusSummary struct {
 	metav1.ObjectMeta
-	Status v1alpha1.OverseerStatus
+	Status v1beta1.FunctionStatus
 }

@@ -6,18 +6,19 @@ import (
 	"os"
 	"time"
 
-	"github.com/google/uuid"
-
-	"github.com/quanxiang-cloud/implant/pkg/watcher/overseerrun"
+	"github.com/openfunction/pkg/client/clientset/versioned"
+	id2 "github.com/quanxiang-cloud/cabin/id"
+	"github.com/quanxiang-cloud/cabin/tailormade/client"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/openfunction"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/postman"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
-	"github.com/quanxiang-cloud/overseer/pkg/client/clientset/versioned"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ct "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/klog"
+	klog "k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -35,11 +36,14 @@ var (
 	concurrency        int
 	target             string
 	cacheMaxEntries    int
+
+	timeout      int
+	maxIdleConns int
 )
 
 func main() {
-	flag.StringVar(&id, "id", uuid.New().String(), "the holder identity name")
-	flag.StringVar(&leaseLockName, "lease-lock-name", "overseer", "the lease lock resource name")
+	flag.StringVar(&id, "id", id2.BaseUUID(), "the holder identity name")
+	flag.StringVar(&leaseLockName, "lease-lock-name", "faas", "the lease lock resource name")
 	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
 	flag.StringVar(&namespace, "namespace", "default", "")
 	flag.DurationVar(&defaultResync, "default-resync", time.Duration(30)*time.Second, "")
@@ -52,6 +56,8 @@ func main() {
 	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
 	flag.StringVar(&target, "target", "localhost:8080", "")
+	flag.IntVar(&timeout, "timeout", 20, "")
+	flag.IntVar(&maxIdleConns, "maxIdleConns", 10, "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -66,7 +72,7 @@ func main() {
 	}
 
 	config := ctrl.GetConfigOrDie()
-	client, err := versioned.NewForConfig(config)
+	k8sClient, err := versioned.NewForConfig(config)
 	if err != nil {
 		klog.Error(err, "unable to get client set")
 		os.Exit(1)
@@ -78,11 +84,15 @@ func main() {
 	<-leader
 	klog.Info("i am leader")
 
-	MainWithClient(ctx, client)
+	c := &client.Config{
+		Timeout:      time.Duration(timeout),
+		MaxIdleConns: maxIdleConns,
+	}
+	MainWithClient(ctx, c, k8sClient)
 }
 
-func MainWithClient(ctx context.Context, client *versioned.Clientset) {
-	worker, err := postman.New(ctx, target)
+func MainWithClient(ctx context.Context, c *client.Config, client *versioned.Clientset) {
+	worker, err := postman.New(ctx, c, target)
 	if err != nil {
 		klog.Error(err, "unable to get worker client")
 		os.Exit(1)
@@ -100,7 +110,7 @@ func MainWithClient(ctx context.Context, client *versioned.Clientset) {
 			reconciler.WithCache(ctx, cacheMaxEntries),
 		)
 	}
-	cc := overseerrun.NewControllerWithConfig(ctx, client, "", defaultResync, opts...)
+	cc := openfunction.NewControllerWithConfig(ctx, client, "", defaultResync, opts...)
 	go cc.Run(ctx.Done())
 
 	err = <-errChan
