@@ -37,7 +37,7 @@ var (
 	target             string
 	cacheMaxEntries    int
 
-	timeout      int
+	timeout      time.Duration
 	maxIdleConns int
 )
 
@@ -56,7 +56,7 @@ func main() {
 	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
 	flag.StringVar(&target, "target", "localhost:8080", "")
-	flag.IntVar(&timeout, "timeout", 20, "")
+	flag.DurationVar(&timeout, "timeout", time.Duration(20)*time.Second, "")
 	flag.IntVar(&maxIdleConns, "maxIdleConns", 10, "")
 	flag.Parse()
 
@@ -85,7 +85,7 @@ func main() {
 	klog.Info("i am leader")
 
 	c := &client.Config{
-		Timeout:      time.Duration(timeout),
+		Timeout:      timeout,
 		MaxIdleConns: maxIdleConns,
 	}
 	MainWithClient(ctx, c, k8sClient)
