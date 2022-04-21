@@ -21,8 +21,10 @@ type Client struct {
 }
 
 type Function struct {
-	Labels map[string]string `json:"labels"`
-	State  string            `json:"state"`
+	State       string `json:"state"`
+	ResourceRef string `json:"resourceRef"`
+	Topic       string `json:"topic"`
+	Name        string `json:"name"`
 }
 
 func New(c *client.Config, target string) *Client {
@@ -41,7 +43,7 @@ type Resp = resp.Resp
 
 func (c *Client) Send(ctx context.Context, fn Function) (*Resp, error) {
 	resp := &Resp{}
-	if err := client.POST(ctx, c.client, c.target, fn, resp); err != nil {
+	if err := POST(ctx, c.client, c.target, fn, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil

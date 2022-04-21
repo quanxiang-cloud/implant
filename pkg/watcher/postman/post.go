@@ -41,7 +41,9 @@ func (s *Sender) SendFN(e chan<- error) func(obj interface{}) {
 
 func serializeObj(sm reconciler.StatusSummary) bc.Function {
 	return bc.Function{
-		Labels: sm.Labels,
-		State:  sm.Status.Build.State,
+		Name:        sm.Name,
+		ResourceRef: sm.Status.Build.ResourceRef,
+		State:       sm.Status.Build.State,
+		Topic:       "build",
 	}
 }
