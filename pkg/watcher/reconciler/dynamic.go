@@ -5,10 +5,12 @@ import (
 
 	"github.com/golang/groupcache/lru"
 	hs "github.com/mitchellh/hashstructure/v2"
-	v1alpha1 "github.com/quanxiang-cloud/overseer/pkg/apis/overseer/v1alpha1"
+	fnV1beta1 "github.com/openfunction/apis/core/v1beta1"
+	prV1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	klog "k8s.io/klog/v2"
 )
 
 func NewImpl(opts ...Options) *Impl {
@@ -24,6 +26,7 @@ func NewImpl(opts ...Options) *Impl {
 }
 
 type Options func(*Impl)
+type ParseOpt func(obj interface{}, method string) interface{}
 
 func WithConsumer(ctx context.Context, fn func(interface{})) Options {
 	return func(i *Impl) {
@@ -37,12 +40,55 @@ func WithCache(ctx context.Context, maxEntries int) Options {
 	}
 }
 
+func WithFunction(ctx context.Context) Options {
+	return func(i *Impl) {
+		i.parse = func(obj interface{}, method string) interface{} {
+			fn, ok := obj.(*fnV1beta1.Function)
+			if !ok {
+				return obj
+			}
+
+			if fn.Status.Build == nil {
+				return nil
+			}
+
+			return Object{
+				Method: method,
+				FnSummary: &FnStatusSummary{
+					ObjectMeta: fn.ObjectMeta,
+					Status:     fn.Status,
+				},
+			}
+		}
+	}
+}
+
+func WithPipelineRun(ctx context.Context) Options {
+	return func(i *Impl) {
+		i.parse = func(obj interface{}, method string) interface{} {
+			pr, ok := obj.(*prV1beta1.PipelineRun)
+			if !ok {
+				return obj
+			}
+
+			return Object{
+				Method: method,
+				PRSummary: &PRStatusSummary{
+					ObjectMeta: pr.ObjectMeta,
+					Status:     pr.Status,
+				},
+			}
+		}
+	}
+}
+
 type Impl struct {
 	Name string
 
 	informer cache.SharedIndexInformer
 	cache    *lru.Cache
 	queue    *queue
+	parse    ParseOpt
 }
 
 func (i *Impl) AddFunc(obj interface{}) {
@@ -77,25 +123,13 @@ func (i *Impl) post(method string, obj interface{}) {
 	if i.shouldDiscard(obj) {
 		return
 	}
-	sm, ok := i.getState(obj)
-	if ok {
-		i.queue.Send(Object{
-			Method:  method,
-			Summary: sm,
-		})
+	if i.parse != nil {
+		obj = i.parse(obj, method)
+		if obj == nil {
+			return
+		}
 	}
-}
-
-func (i *Impl) getState(obj interface{}) (*StatusSummary, bool) {
-	osr, ok := obj.(*v1alpha1.Overseer)
-	if !ok {
-		return nil, false
-	}
-
-	return &StatusSummary{
-		ObjectMeta: osr.ObjectMeta,
-		Status:     osr.Status,
-	}, true
+	i.queue.Send(obj)
 }
 
 func (i *Impl) Run(stopCh <-chan struct{}) {
@@ -109,11 +143,17 @@ const (
 )
 
 type Object struct {
-	Method  string
-	Summary *StatusSummary
+	Method    string
+	FnSummary *FnStatusSummary
+	PRSummary *PRStatusSummary
 }
 
-type StatusSummary struct {
+type FnStatusSummary struct {
 	metav1.ObjectMeta
-	Status v1alpha1.OverseerStatus
+	Status fnV1beta1.FunctionStatus
+}
+
+type PRStatusSummary struct {
+	metav1.ObjectMeta
+	Status prV1beta1.PipelineRunStatus
 }
