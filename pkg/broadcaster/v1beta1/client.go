@@ -27,6 +27,12 @@ type Function struct {
 	Name        string `json:"name"`
 }
 
+type Pipeline struct {
+	Name  string `json:"name"`
+	Topic string `json:"topic"`
+	State string `json:"state"`
+}
+
 func New(c *client.Config, target string) *Client {
 	client := client.New(client.Config{
 		Timeout:      c.Timeout,
@@ -41,9 +47,9 @@ func New(c *client.Config, target string) *Client {
 
 type Resp = resp.Resp
 
-func (c *Client) Send(ctx context.Context, fn Function) (*Resp, error) {
+func (c *Client) Send(ctx context.Context, params interface{}) (*Resp, error) {
 	resp := &Resp{}
-	if err := POST(ctx, c.client, c.target, fn, resp); err != nil {
+	if err := POST(ctx, c.client, c.target, params, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil

@@ -6,12 +6,13 @@ import (
 	"os"
 	"time"
 
-	"github.com/openfunction/pkg/client/clientset/versioned"
+	fnClientset "github.com/openfunction/pkg/client/clientset/versioned"
 	id2 "github.com/quanxiang-cloud/cabin/id"
 	"github.com/quanxiang-cloud/cabin/tailormade/client"
-	"github.com/quanxiang-cloud/implant/pkg/watcher/openfunction"
+	informers "github.com/quanxiang-cloud/implant/pkg/watcher/informers"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/postman"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
+	tkClientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ct "k8s.io/client-go/kubernetes"
@@ -72,11 +73,17 @@ func main() {
 	}
 
 	config := ctrl.GetConfigOrDie()
-	k8sClient, err := versioned.NewForConfig(config)
+	fnClient, err := fnClientset.NewForConfig(config)
 	if err != nil {
 		klog.Error(err, "unable to get client set")
 		os.Exit(1)
 	}
+	tkClient, err := tkClientset.NewForConfig(config)
+	if err != nil {
+		klog.Error(err, "unable to get client set")
+		os.Exit(1)
+	}
+
 	ctx := context.Background()
 
 	leader := make(chan struct{})
@@ -88,19 +95,24 @@ func main() {
 		Timeout:      timeout,
 		MaxIdleConns: maxIdleConns,
 	}
-	MainWithClient(ctx, c, k8sClient)
+
+	errChan := make(chan error)
+	watchFn(ctx, errChan, c, fnClient)
+	watchTk(ctx, errChan, c, tkClient)
+	err = <-errChan
+	klog.Error(err)
 }
 
-func MainWithClient(ctx context.Context, c *client.Config, client *versioned.Clientset) {
+func watchFn(ctx context.Context, errChan chan error, c *client.Config, client *fnClientset.Clientset) {
 	worker, err := postman.New(ctx, c, target)
 	if err != nil {
-		klog.Error(err, "unable to get worker client")
+		klog.Error(err, "unable to get function worker client")
 		os.Exit(1)
 	}
-	klog.Info("start working")
+	klog.Info("function workers start working")
 
 	opts := make([]reconciler.Options, 0)
-	errChan := make(chan error)
+
 	for i := 0; i < concurrency; i++ {
 		opts = append(opts,
 			reconciler.WithConsumer(
@@ -108,13 +120,35 @@ func MainWithClient(ctx context.Context, c *client.Config, client *versioned.Cli
 				worker.SendFN(errChan),
 			),
 			reconciler.WithCache(ctx, cacheMaxEntries),
+			reconciler.WithFunction(ctx),
 		)
 	}
-	cc := openfunction.NewControllerWithConfig(ctx, client, "", defaultResync, opts...)
+	cc := informers.NewFnControllerWithConfig(ctx, client, "", defaultResync, opts...)
 	go cc.Run(ctx.Done())
+}
 
-	err = <-errChan
-	klog.Error(err)
+func watchTk(ctx context.Context, errChan chan error, c *client.Config, client *tkClientset.Clientset) {
+	worker, err := postman.New(ctx, c, target)
+	if err != nil {
+		klog.Error(err, "unable to get pipeline worker client")
+		os.Exit(1)
+	}
+	klog.Info("pipeline workers start working")
+
+	opts := make([]reconciler.Options, 0)
+
+	for i := 0; i < concurrency; i++ {
+		opts = append(opts,
+			reconciler.WithConsumer(
+				ctx,
+				worker.SendTK(errChan),
+			),
+			reconciler.WithCache(ctx, cacheMaxEntries),
+			reconciler.WithPipelineRun(ctx),
+		)
+	}
+	cc := informers.NewPipelineControllerWithConfig(ctx, client, "", defaultResync, opts...)
+	go cc.Run(ctx.Done())
 }
 
 func HA(ctx context.Context, config *rest.Config, going chan<- struct{}) {

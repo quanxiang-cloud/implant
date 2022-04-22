@@ -27,7 +27,7 @@ func (s *Sender) SendFN(e chan<- error) func(obj interface{}) {
 			e <- fmt.Errorf("unknown obj type")
 		}
 
-		objFn := serializeObj(*ro.Summary)
+		objFn := serializeFn(*ro.FnSummary)
 
 		ctx := context.Background()
 		_, err := s.client.Send(ctx, objFn)
@@ -39,11 +39,39 @@ func (s *Sender) SendFN(e chan<- error) func(obj interface{}) {
 	}
 }
 
-func serializeObj(sm reconciler.StatusSummary) bc.Function {
+func serializeFn(sm reconciler.FnStatusSummary) bc.Function {
 	return bc.Function{
 		Name:        sm.Name,
 		ResourceRef: sm.Status.Build.ResourceRef,
 		State:       sm.Status.Build.State,
 		Topic:       "build",
+	}
+}
+
+func (s *Sender) SendTK(e chan<- error) func(obj interface{}) {
+	return func(obj interface{}) {
+		ro, ok := obj.(reconciler.Object)
+		if !ok {
+			e <- fmt.Errorf("unknown obj type")
+		}
+
+		objFn := serializePr(*ro.PRSummary)
+
+		ctx := context.Background()
+		_, err := s.client.Send(ctx, objFn)
+
+		if err != nil {
+			klog.Error(err)
+			e <- err
+		}
+	}
+}
+
+func serializePr(sm reconciler.PRStatusSummary) bc.Pipeline {
+	return bc.Pipeline{
+		Name: sm.Name,
+		// TODO: check length
+		State: string(sm.Status.Conditions[0].Type),
+		Topic: "builder",
 	}
 }

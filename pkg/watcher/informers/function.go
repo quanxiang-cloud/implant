@@ -1,4 +1,4 @@
-package openfunction
+package informers
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 )
 
-func NewController(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
-	return NewControllerWithConfig(ctx, client, namespace, defaultResync, opts...)
+func NewFnController(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
+	return NewFnControllerWithConfig(ctx, client, namespace, defaultResync, opts...)
 }
 
-func NewControllerWithConfig(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
+func NewFnControllerWithConfig(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
 	informer := core.New(externalversions.NewSharedInformerFactory(client, defaultResync), namespace, nil).
 		V1beta1().
 		Functions().
