@@ -35,7 +35,8 @@ var (
 	renewDeadline      time.Duration
 	retryPeriod        time.Duration
 	concurrency        int
-	target             string
+	fnUpdate           string
+	docUpdate          string
 	cacheMaxEntries    int
 
 	timeout      time.Duration
@@ -56,7 +57,8 @@ func main() {
 
 	flag.IntVar(&cacheMaxEntries, "cache-max-entries", 1024, "")
 	flag.IntVar(&concurrency, "concurrency", 1, "")
-	flag.StringVar(&target, "target", "localhost:8080", "")
+	flag.StringVar(&fnUpdate, "fn-update", "localhost:8080", "")
+	flag.StringVar(&docUpdate, "doc-update", "localhost:8080", "")
 	flag.DurationVar(&timeout, "timeout", time.Duration(20)*time.Second, "")
 	flag.IntVar(&maxIdleConns, "maxIdleConns", 10, "")
 	flag.Parse()
@@ -67,7 +69,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if target == "" {
+	if fnUpdate == "" {
 		klog.Error("target must be set")
 		os.Exit(1)
 	}
@@ -104,7 +106,7 @@ func main() {
 }
 
 func watchFn(ctx context.Context, errChan chan error, c *client.Config, client *fnClientset.Clientset) {
-	worker, err := postman.New(ctx, c, target)
+	worker, err := postman.New(ctx, c, fnUpdate)
 	if err != nil {
 		klog.Error(err, "unable to get function worker client")
 		os.Exit(1)
@@ -128,7 +130,7 @@ func watchFn(ctx context.Context, errChan chan error, c *client.Config, client *
 }
 
 func watchTk(ctx context.Context, errChan chan error, c *client.Config, client *tkClientset.Clientset) {
-	worker, err := postman.New(ctx, c, target)
+	worker, err := postman.New(ctx, c, docUpdate)
 	if err != nil {
 		klog.Error(err, "unable to get pipeline worker client")
 		os.Exit(1)
