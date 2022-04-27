@@ -10,12 +10,8 @@ import (
 	"github.com/tektoncd/pipeline/pkg/client/informers/externalversions/pipeline"
 )
 
-func NewPipelineController(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
-	return NewPipelineControllerWithConfig(ctx, client, namespace, defaultResync, opts...)
-}
-
-func NewPipelineControllerWithConfig(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
-	informer := pipeline.New(externalversions.NewSharedInformerFactory(client, defaultResync), namespace, nil).
+func NewPipelineControllerWithConfig(ctx context.Context, client Client, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
+	informer := pipeline.New(externalversions.NewSharedInformerFactory(client.(versioned.Interface), defaultResync), namespace, nil).
 		V1beta1().
 		PipelineRuns().
 		Informer()

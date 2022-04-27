@@ -10,12 +10,8 @@ import (
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 )
 
-func NewFnController(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
-	return NewFnControllerWithConfig(ctx, client, namespace, defaultResync, opts...)
-}
-
-func NewFnControllerWithConfig(ctx context.Context, client versioned.Interface, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
-	informer := core.New(externalversions.NewSharedInformerFactory(client, defaultResync), namespace, nil).
+func NewFnControllerWithConfig(ctx context.Context, client Client, namespace string, defaultResync time.Duration, opts ...reconciler.Options) *reconciler.Impl {
+	informer := core.New(externalversions.NewSharedInformerFactory(client.(versioned.Interface), defaultResync), namespace, nil).
 		V1beta1().
 		Functions().
 		Informer()
