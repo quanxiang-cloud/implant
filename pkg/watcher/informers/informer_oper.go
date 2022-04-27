@@ -15,8 +15,8 @@ type Client interface{}
 
 var (
 	informers = map[reflect.Type]f{
-		reflect.TypeOf(fnClientset.Clientset{}): NewFnControllerWithConfig,
-		reflect.TypeOf(tkClientset.Clientset{}): NewPipelineControllerWithConfig,
+		reflect.TypeOf(&fnClientset.Clientset{}): NewFnControllerWithConfig,
+		reflect.TypeOf(&tkClientset.Clientset{}): NewPipelineControllerWithConfig,
 	}
 )
 
@@ -42,6 +42,7 @@ func (w *Oper) Run(ctx context.Context, client Client) error {
 	if ok {
 		impl := f(ctx, client, w.Namespace, w.DefaultResync, w.Options...)
 		go impl.Run(ctx.Done())
+		return nil
 	}
 	return fmt.Errorf("the type of (%v) is not supported", client)
 }
