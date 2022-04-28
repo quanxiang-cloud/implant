@@ -10,6 +10,7 @@ import (
 	id2 "github.com/quanxiang-cloud/cabin/id"
 	"github.com/quanxiang-cloud/cabin/tailormade/client"
 	"github.com/quanxiang-cloud/implant/pkg/watcher"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/informers"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	tkClientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
@@ -75,38 +76,46 @@ func main() {
 	}
 	config := ctrl.GetConfigOrDie()
 	ctx := context.Background()
-	leader := make(chan struct{})
-	go HA(ctx, config, leader)
-	<-leader
+
+	// leader := make(chan struct{})
+	// go HA(ctx, config, leader)
+	// <-leader
 	klog.Info("i am leader")
 
 	c := &client.Config{
 		Timeout:      timeout,
 		MaxIdleConns: maxIdleConns,
 	}
-	watch(ctx, c, config)
+
+	errChan := make(chan error)
+	bus, err := bus.NewDaprClient(ctx, errChan)
+	if err != nil {
+		klog.Error(err)
+		os.Exit(1)
+	}
+
+	watch(ctx, c, config, bus)
+
+	err = <-errChan
+	klog.Error(err)
 }
 
-func watch(ctx context.Context, cc *client.Config, rc *rest.Config) {
-	errChan := make(chan error)
+func watch(ctx context.Context, cc *client.Config, rc *rest.Config, bus *bus.EventBus) {
 	oper := informers.Oper{
 		Namespace:     namespace,
 		DefaultResync: defaultResync,
 	}
 	watcher.NewWatcherWithOper(ctx, oper).
-		Concurrency(concurrency, cacheMaxEntries).
-		Sender(cc, fnUpdate, errChan).
+		Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
 		Opts(reconciler.WithFunction(ctx)).
 		RunOrDie(fnClientset.NewForConfigOrDie(rc))
 
 	watcher.NewWatcherWithOper(ctx, oper).
-		Concurrency(concurrency, cacheMaxEntries).
-		Sender(cc, docUpdate, errChan).
+		Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
 		Opts(reconciler.WithPipelineRun(ctx)).
 		RunOrDie(tkClientset.NewForConfigOrDie(rc))
-
-	err := <-errChan
-	klog.Error(err)
 }
 
 func HA(ctx context.Context, config *rest.Config, going chan<- struct{}) {

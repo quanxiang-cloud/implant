@@ -3,9 +3,8 @@ package watcher
 import (
 	"context"
 
-	"github.com/quanxiang-cloud/cabin/tailormade/client"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/informers"
-	"github.com/quanxiang-cloud/implant/pkg/watcher/postman"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	"k8s.io/klog/v2"
 )
@@ -33,19 +32,15 @@ func (w *Watcher) Opts(opts ...reconciler.Options) *Watcher {
 	return w
 }
 
-func (w *Watcher) Concurrency(n int, cacheMaxEntries int) *Watcher {
-	for i := 0; i < n; i++ {
-		w.Oper.Opts(w.CTX, reconciler.WithCache(w.CTX, cacheMaxEntries))
-	}
+func (w *Watcher) Cache(cacheMaxEntries int) *Watcher {
+	w.Oper.Opts(w.CTX, reconciler.WithCache(w.CTX, cacheMaxEntries))
 	return w
 }
 
-func (w *Watcher) Sender(c *client.Config, url string, errChan chan error) *Watcher {
-	worker := postman.New(w.CTX, c, url)
-	w.Oper.Opts(w.CTX, reconciler.WithConsumer(
-		w.CTX,
-		worker.Send(errChan),
-	))
+func (w *Watcher) Bus(bus *bus.EventBus, concurrency int) *Watcher {
+	for i := 0; i < concurrency; i++ {
+		w.Oper.Opts(w.CTX, reconciler.WithConsumer(w.CTX, bus))
+	}
 	return w
 }
 
