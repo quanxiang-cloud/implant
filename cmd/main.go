@@ -39,6 +39,7 @@ var (
 	fnUpdate           string
 	docUpdate          string
 	cacheMaxEntries    int
+	pubsubName         string
 
 	timeout      time.Duration
 	maxIdleConns int
@@ -62,6 +63,7 @@ func main() {
 	flag.StringVar(&docUpdate, "doc-update", "localhost:8080", "")
 	flag.DurationVar(&timeout, "timeout", time.Duration(20)*time.Second, "")
 	flag.IntVar(&maxIdleConns, "maxIdleConns", 10, "")
+	flag.StringVar(&pubsubName, "pubsub", "", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -77,9 +79,9 @@ func main() {
 	config := ctrl.GetConfigOrDie()
 	ctx := context.Background()
 
-	// leader := make(chan struct{})
-	// go HA(ctx, config, leader)
-	// <-leader
+	leader := make(chan struct{})
+	go HA(ctx, config, leader)
+	<-leader
 	klog.Info("i am leader")
 
 	c := &client.Config{
@@ -88,7 +90,8 @@ func main() {
 	}
 
 	errChan := make(chan error)
-	bus, err := bus.NewDaprClient(ctx, errChan)
+	// TODO: remove
+	bus, err := bus.NewDaprClient(ctx, errChan, bus.WithPubsubName(pubsubName))
 	if err != nil {
 		klog.Error(err)
 		os.Exit(1)

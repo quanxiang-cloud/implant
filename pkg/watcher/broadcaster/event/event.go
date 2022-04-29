@@ -7,8 +7,8 @@ import (
 )
 
 type Message struct {
-	*FnMessage
-	*PrMessage
+	Fn *FnMessage `json:"fn"`
+	Pr *PrMessage `json:"pr"`
 }
 
 type FnMessage struct {

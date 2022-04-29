@@ -18,6 +18,7 @@ type EventBus struct {
 
 func NewDaprClient(ctx context.Context, errChan chan error, opts ...Option) (*EventBus, error) {
 	client, err := daprd.NewClient()
+	// client, err := daprd.NewClientWithPort("50005")
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +50,6 @@ func (b *EventBus) Send(ctx context.Context, obj interface{}) {
 	if !ok {
 		b.errChan <- fmt.Errorf("unknown obj type")
 	}
-	_ = data
-
 	err := b.sendMessage(ctx, data)
 	if err != nil {
 		klog.Error(err)
@@ -60,9 +59,8 @@ func (b *EventBus) Send(ctx context.Context, obj interface{}) {
 
 func (b *EventBus) sendMessage(ctx context.Context, req *event.Data) error {
 	// TODO: remove
-	var topic string = "faas.async.event"
+	var topic string = "lowcode.faas"
 	msg := b.serialize(req)
-
 	// TODO: check msg
 	if err := b.publish(ctx, topic, msg); err != nil {
 		klog.Error(err)
@@ -75,10 +73,10 @@ func (b *EventBus) sendMessage(ctx context.Context, req *event.Data) error {
 func (b *EventBus) serialize(data *event.Data) *event.Message {
 	msg := &event.Message{}
 	if data.FnStatusSummary != nil {
-		msg.FnMessage = b.serializeFn(data)
+		msg.Fn = b.serializeFn(data)
 	}
 	if data.PRStatusSummary != nil {
-		msg.PrMessage = b.serializePr(data)
+		msg.Pr = b.serializePr(data)
 	}
 	return msg
 }

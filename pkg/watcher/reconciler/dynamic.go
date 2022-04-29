@@ -49,11 +49,14 @@ func WithFunction(ctx context.Context) Options {
 				return obj
 			}
 
+			// if _, ok := fn.Labels["lowcode.faas"]; !ok || fn.Status.Build == nil {
+			// 	return nil
+			// }
 			if fn.Status.Build == nil {
 				return nil
 			}
 
-			return event.Data{
+			return &event.Data{
 				// Method: method,
 				FnStatusSummary: &event.FnStatusSummary{
 					ObjectMeta: fn.ObjectMeta,
@@ -72,7 +75,11 @@ func WithPipelineRun(ctx context.Context) Options {
 				return obj
 			}
 
-			return event.Data{
+			// if _, ok := pr.Labels["lowcode.faas"]; !ok {
+			// 	return nil
+			// }
+
+			return &event.Data{
 				// Method: method,
 				PRStatusSummary: &event.PRStatusSummary{
 					ObjectMeta: pr.ObjectMeta,

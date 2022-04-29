@@ -12,5 +12,3 @@ COPY --from=certs /etc/ssl/certs /etc/ssl/certs
 
 WORKDIR /faas
 COPY --from=builder ./build/implant ./cmd/
-
-ENTRYPOINT ["./cmd/implant","-fn-update=$FN_UPDATE", "-doc-update=$DOC_UPDATE"]
