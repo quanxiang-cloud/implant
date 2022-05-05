@@ -14,6 +14,7 @@ import (
 	"github.com/quanxiang-cloud/implant/pkg/watcher/informers"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	tkClientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	knClientset "knative.dev/serving/pkg/client/clientset/versioned"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ct "k8s.io/client-go/kubernetes"
@@ -28,7 +29,8 @@ import (
 var (
 	leaseLockName      string
 	leaseLockNamespace string
-	namespace          string
+	fnNamespace        string
+	SvcNamespace       string
 	id                 string
 	defaultResync      time.Duration
 	releaseOnCancel    bool
@@ -49,7 +51,8 @@ func main() {
 	flag.StringVar(&id, "id", id2.BaseUUID(), "the holder identity name")
 	flag.StringVar(&leaseLockName, "lease-lock-name", "faas", "the lease lock resource name")
 	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
-	flag.StringVar(&namespace, "namespace", "default", "")
+	flag.StringVar(&fnNamespace, "fn-namespace", "default", "")
+	flag.StringVar(&SvcNamespace, "svc-namespace", "default", "")
 	flag.DurationVar(&defaultResync, "default-resync", time.Duration(30)*time.Second, "")
 
 	flag.BoolVar(&releaseOnCancel, "release-on-cancel", true, "")
@@ -105,9 +108,10 @@ func main() {
 
 func watch(ctx context.Context, cc *client.Config, rc *rest.Config, bus *bus.EventBus) {
 	oper := informers.Oper{
-		Namespace:     namespace,
+		Namespace:     fnNamespace,
 		DefaultResync: defaultResync,
 	}
+
 	watcher.NewWatcherWithOper(ctx, oper).
 		Cache(cacheMaxEntries).
 		Bus(bus, concurrency).
@@ -119,6 +123,14 @@ func watch(ctx context.Context, cc *client.Config, rc *rest.Config, bus *bus.Eve
 		Bus(bus, concurrency).
 		Opts(reconciler.WithPipelineRun(ctx)).
 		RunOrDie(tkClientset.NewForConfigOrDie(rc))
+
+	watcher.NewWatcherWithOper(ctx, informers.Oper{
+		Namespace:     SvcNamespace,
+		DefaultResync: defaultResync,
+	}).Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
+		Opts(reconciler.WithServing(ctx)).
+		RunOrDie(knClientset.NewForConfigOrDie(rc))
 }
 
 func HA(ctx context.Context, config *rest.Config, going chan<- struct{}) {

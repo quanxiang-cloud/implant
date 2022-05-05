@@ -9,6 +9,7 @@ import (
 	fnClientset "github.com/openfunction/pkg/client/clientset/versioned"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	tkClientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	knClientset "knative.dev/serving/pkg/client/clientset/versioned"
 )
 
 type Client interface{}
@@ -17,6 +18,7 @@ var (
 	informers = map[reflect.Type]f{
 		reflect.TypeOf(&fnClientset.Clientset{}): NewFnControllerWithConfig,
 		reflect.TypeOf(&tkClientset.Clientset{}): NewPipelineControllerWithConfig,
+		reflect.TypeOf(&knClientset.Clientset{}): NewServingControllerWithConfig,
 	}
 )
 

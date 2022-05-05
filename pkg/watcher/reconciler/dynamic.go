@@ -9,6 +9,7 @@ import (
 	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/event"
 	prV1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	knV1 "knative.dev/serving/pkg/apis/serving/v1"
 
 	"k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
@@ -84,6 +85,29 @@ func WithPipelineRun(ctx context.Context) Options {
 				PRStatusSummary: &event.PRStatusSummary{
 					ObjectMeta: pr.ObjectMeta,
 					Status:     pr.Status,
+				},
+			}
+		}
+	}
+}
+
+func WithServing(ctx context.Context) Options {
+	return func(i *Impl) {
+		i.parse = func(obj interface{}, method string) interface{} {
+			ksvc, ok := obj.(*knV1.Service)
+			if !ok {
+				return obj
+			}
+
+			// if _, ok := pr.Labels["lowcode.faas"]; !ok {
+			// 	return nil
+			// }
+
+			return &event.Data{
+				// Method: method,
+				SvcStatusSummary: &event.SvcStatusSummary{
+					ObjectMeta: ksvc.ObjectMeta,
+					Status:     ksvc.Status,
 				},
 			}
 		}
