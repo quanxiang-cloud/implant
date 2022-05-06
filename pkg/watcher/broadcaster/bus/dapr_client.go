@@ -96,18 +96,26 @@ func (b *EventBus) serializeFn(data *event.Data) *event.FnMessage {
 }
 
 func (b *EventBus) serializePr(data *event.Data) *event.PrMessage {
+	var state string = ""
+	if len(data.PRStatusSummary.Status.Conditions) > 0 {
+		state = string(data.PRStatusSummary.Status.Conditions[0].Status)
+	}
 	return &event.PrMessage{
 		Name:  data.PRStatusSummary.Name,
 		Topic: data.PRStatusSummary.Namespace,
-		State: string(data.PRStatusSummary.Status.Conditions[0].Status),
+		State: state,
 	}
 }
 
 func (b *EventBus) serializeSvc(data *event.Data) *event.SvcMessage {
+	var state string = ""
+	if len(data.PRStatusSummary.Status.Conditions) > 0 {
+		state = string(data.SvcStatusSummary.Status.Conditions[0].Status)
+	}
 	return &event.SvcMessage{
 		Name:    data.SvcStatusSummary.Name,
 		Topic:   data.SvcStatusSummary.Namespace,
-		State:   string(data.SvcStatusSummary.Status.Conditions[0].Status),
+		State:   state,
 		Message: data.SvcStatusSummary.Status.Conditions[0].Message,
 	}
 }
