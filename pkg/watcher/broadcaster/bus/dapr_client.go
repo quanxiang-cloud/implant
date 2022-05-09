@@ -111,7 +111,7 @@ func (b *EventBus) serializePr(data *event.Data) *event.PrMessage {
 
 func (b *EventBus) serializeSvc(data *event.Data) *event.SvcMessage {
 	var state string = ""
-	l := len(data.PRStatusSummary.Status.Conditions)
+	l := len(data.SvcStatusSummary.Status.Conditions)
 	if l > 0 {
 		state = string(data.SvcStatusSummary.Status.Conditions[l-1].Status)
 	}
