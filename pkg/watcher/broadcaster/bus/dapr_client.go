@@ -16,6 +16,7 @@ type EventBus struct {
 	errChan    chan error
 }
 
+// TODO: topic
 func NewDaprClient(ctx context.Context, errChan chan error, opts ...Option) (*EventBus, error) {
 	client, err := daprd.NewClient()
 	if err != nil {
@@ -72,15 +73,12 @@ func (b *EventBus) sendMessage(ctx context.Context, req *event.Data) error {
 func (b *EventBus) serialize(data *event.Data) *event.Message {
 	msg := &event.Message{}
 	if data.FnStatusSummary != nil {
-		klog.Info("serialize funtions...")
 		msg.Fn = b.serializeFn(data)
 	}
 	if data.PRStatusSummary != nil {
-		klog.Info("serialize pipelineRun...")
 		msg.Pr = b.serializePr(data)
 	}
 	if data.SvcStatusSummary != nil {
-		klog.Info("serialize ksvc...")
 		msg.Svc = b.serializeSvc(data)
 	}
 	return msg
@@ -104,7 +102,7 @@ func (b *EventBus) serializePr(data *event.Data) *event.PrMessage {
 
 	return &event.PrMessage{
 		Name:  data.PRStatusSummary.Name,
-		Topic: data.PRStatusSummary.Namespace,
+		Topic: "register",
 		State: state,
 	}
 }
@@ -123,7 +121,6 @@ func (b *EventBus) serializeSvc(data *event.Data) *event.SvcMessage {
 }
 
 func (b *EventBus) publish(ctx context.Context, topic string, data interface{}) error {
-	klog.Info("send message ", " topic ", topic)
 	if err := b.daprClient.PublishEvent(ctx, b.pubsubName, topic, data); err != nil {
 		klog.Error(err, "publishEvent", "topic", topic, "pubsubName", b.pubsubName)
 		return err
