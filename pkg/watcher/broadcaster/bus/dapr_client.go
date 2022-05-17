@@ -18,7 +18,7 @@ type EventBus struct {
 
 // TODO: topic
 func NewDaprClient(ctx context.Context, errChan chan error, opts ...Option) (*EventBus, error) {
-	client, err := daprd.NewClient()
+	client, err := InitDaprClientIfNil()
 	if err != nil {
 		return nil, err
 	}
