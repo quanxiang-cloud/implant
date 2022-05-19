@@ -9,10 +9,12 @@ import (
 	fnClientset "github.com/openfunction/pkg/client/clientset/versioned"
 	id2 "github.com/quanxiang-cloud/cabin/id"
 	"github.com/quanxiang-cloud/cabin/tailormade/client"
-	informers "github.com/quanxiang-cloud/implant/pkg/watcher/informers"
-	"github.com/quanxiang-cloud/implant/pkg/watcher/postman"
+	"github.com/quanxiang-cloud/implant/pkg/watcher"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/informers"
 	"github.com/quanxiang-cloud/implant/pkg/watcher/reconciler"
 	tkClientset "github.com/tektoncd/pipeline/pkg/client/clientset/versioned"
+	knClientset "knative.dev/serving/pkg/client/clientset/versioned"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ct "k8s.io/client-go/kubernetes"
@@ -27,7 +29,8 @@ import (
 var (
 	leaseLockName      string
 	leaseLockNamespace string
-	namespace          string
+	fnNamespace        string
+	SvcNamespace       string
 	id                 string
 	defaultResync      time.Duration
 	releaseOnCancel    bool
@@ -38,6 +41,7 @@ var (
 	fnUpdate           string
 	docUpdate          string
 	cacheMaxEntries    int
+	pubsubName         string
 
 	timeout      time.Duration
 	maxIdleConns int
@@ -47,7 +51,8 @@ func main() {
 	flag.StringVar(&id, "id", id2.BaseUUID(), "the holder identity name")
 	flag.StringVar(&leaseLockName, "lease-lock-name", "faas", "the lease lock resource name")
 	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
-	flag.StringVar(&namespace, "namespace", "default", "")
+	flag.StringVar(&fnNamespace, "fn-namespace", "default", "")
+	flag.StringVar(&SvcNamespace, "svc-namespace", "default", "")
 	flag.DurationVar(&defaultResync, "default-resync", time.Duration(30)*time.Second, "")
 
 	flag.BoolVar(&releaseOnCancel, "release-on-cancel", true, "")
@@ -61,6 +66,7 @@ func main() {
 	flag.StringVar(&docUpdate, "doc-update", "localhost:8080", "")
 	flag.DurationVar(&timeout, "timeout", time.Duration(20)*time.Second, "")
 	flag.IntVar(&maxIdleConns, "maxIdleConns", 10, "")
+	flag.StringVar(&pubsubName, "pubsub", "", "")
 	flag.Parse()
 
 	opts := zap.Options{
@@ -69,23 +75,11 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if fnUpdate == "" {
+	if fnUpdate == "" || docUpdate == "" {
 		klog.Error("target must be set")
 		os.Exit(1)
 	}
-
 	config := ctrl.GetConfigOrDie()
-	fnClient, err := fnClientset.NewForConfig(config)
-	if err != nil {
-		klog.Error(err, "unable to get client set")
-		os.Exit(1)
-	}
-	tkClient, err := tkClientset.NewForConfig(config)
-	if err != nil {
-		klog.Error(err, "unable to get client set")
-		os.Exit(1)
-	}
-
 	ctx := context.Background()
 
 	leader := make(chan struct{})
@@ -99,58 +93,44 @@ func main() {
 	}
 
 	errChan := make(chan error)
-	watchFn(ctx, errChan, c, fnClient)
-	watchTk(ctx, errChan, c, tkClient)
+	// TODO: remove
+	bus, err := bus.NewDaprClient(ctx, errChan, bus.WithPubsubName(pubsubName))
+	if err != nil {
+		klog.Error(err)
+		os.Exit(1)
+	}
+
+	watch(ctx, c, config, bus)
+
 	err = <-errChan
 	klog.Error(err)
 }
 
-func watchFn(ctx context.Context, errChan chan error, c *client.Config, client *fnClientset.Clientset) {
-	worker, err := postman.New(ctx, c, fnUpdate)
-	if err != nil {
-		klog.Error(err, "unable to get function worker client")
-		os.Exit(1)
+func watch(ctx context.Context, cc *client.Config, rc *rest.Config, bus *bus.EventBus) {
+	oper := informers.Oper{
+		Namespace:     fnNamespace,
+		DefaultResync: defaultResync,
 	}
-	klog.Info("function workers start working")
 
-	opts := make([]reconciler.Options, 0)
+	watcher.NewWatcherWithOper(ctx, oper).
+		Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
+		Opts(reconciler.WithFunction(ctx)).
+		RunOrDie(fnClientset.NewForConfigOrDie(rc))
 
-	for i := 0; i < concurrency; i++ {
-		opts = append(opts,
-			reconciler.WithConsumer(
-				ctx,
-				worker.SendFN(errChan),
-			),
-			reconciler.WithCache(ctx, cacheMaxEntries),
-			reconciler.WithFunction(ctx),
-		)
-	}
-	cc := informers.NewFnControllerWithConfig(ctx, client, "", defaultResync, opts...)
-	go cc.Run(ctx.Done())
-}
+	watcher.NewWatcherWithOper(ctx, oper).
+		Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
+		Opts(reconciler.WithPipelineRun(ctx)).
+		RunOrDie(tkClientset.NewForConfigOrDie(rc))
 
-func watchTk(ctx context.Context, errChan chan error, c *client.Config, client *tkClientset.Clientset) {
-	worker, err := postman.New(ctx, c, docUpdate)
-	if err != nil {
-		klog.Error(err, "unable to get pipeline worker client")
-		os.Exit(1)
-	}
-	klog.Info("pipeline workers start working")
-
-	opts := make([]reconciler.Options, 0)
-
-	for i := 0; i < concurrency; i++ {
-		opts = append(opts,
-			reconciler.WithConsumer(
-				ctx,
-				worker.SendTK(errChan),
-			),
-			reconciler.WithCache(ctx, cacheMaxEntries),
-			reconciler.WithPipelineRun(ctx),
-		)
-	}
-	cc := informers.NewPipelineControllerWithConfig(ctx, client, "", defaultResync, opts...)
-	go cc.Run(ctx.Done())
+	watcher.NewWatcherWithOper(ctx, informers.Oper{
+		Namespace:     SvcNamespace,
+		DefaultResync: defaultResync,
+	}).Cache(cacheMaxEntries).
+		Bus(bus, concurrency).
+		Opts(reconciler.WithServing(ctx)).
+		RunOrDie(knClientset.NewForConfigOrDie(rc))
 }
 
 func HA(ctx context.Context, config *rest.Config, going chan<- struct{}) {

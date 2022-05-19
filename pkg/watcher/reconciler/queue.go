@@ -1,6 +1,10 @@
 package reconciler
 
-import "context"
+import (
+	"context"
+
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
+)
 
 func newQueue() *queue {
 	return &queue{
@@ -16,14 +20,14 @@ func (q *queue) Send(item interface{}) {
 	q.Chan <- item
 }
 
-func (q *queue) Consumer(ctx context.Context, fn func(interface{})) {
+func (q *queue) Consumer(ctx context.Context, bus *bus.EventBus) {
 	for {
 		select {
 		case item, ok := <-q.Chan:
 			if !ok {
 				return
 			}
-			fn(item)
+			bus.Send(ctx, item)
 		case <-ctx.Done():
 		}
 	}

@@ -6,9 +6,11 @@ import (
 	"github.com/golang/groupcache/lru"
 	hs "github.com/mitchellh/hashstructure/v2"
 	fnV1beta1 "github.com/openfunction/apis/core/v1beta1"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/bus"
+	"github.com/quanxiang-cloud/implant/pkg/watcher/broadcaster/event"
 	prV1beta1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1beta1"
+	knV1 "knative.dev/serving/pkg/apis/serving/v1"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 	klog "k8s.io/klog/v2"
 )
@@ -28,9 +30,9 @@ func NewImpl(opts ...Options) *Impl {
 type Options func(*Impl)
 type ParseOpt func(obj interface{}, method string) interface{}
 
-func WithConsumer(ctx context.Context, fn func(interface{})) Options {
+func WithConsumer(ctx context.Context, bus *bus.EventBus) Options {
 	return func(i *Impl) {
-		go i.queue.Consumer(ctx, fn)
+		go i.queue.Consumer(ctx, bus)
 	}
 }
 
@@ -48,13 +50,16 @@ func WithFunction(ctx context.Context) Options {
 				return obj
 			}
 
+			// if _, ok := fn.Labels["lowcode.faas"]; !ok || fn.Status.Build == nil {
+			// 	return nil
+			// }
 			if fn.Status.Build == nil {
 				return nil
 			}
 
-			return Object{
-				Method: method,
-				FnSummary: &FnStatusSummary{
+			return &event.Data{
+				// Method: method,
+				FnStatusSummary: &event.FnStatusSummary{
 					ObjectMeta: fn.ObjectMeta,
 					Status:     fn.Status,
 				},
@@ -71,11 +76,38 @@ func WithPipelineRun(ctx context.Context) Options {
 				return obj
 			}
 
-			return Object{
-				Method: method,
-				PRSummary: &PRStatusSummary{
+			// if _, ok := pr.Labels["lowcode.faas"]; !ok {
+			// 	return nil
+			// }
+
+			return &event.Data{
+				// Method: method,
+				PRStatusSummary: &event.PRStatusSummary{
 					ObjectMeta: pr.ObjectMeta,
 					Status:     pr.Status,
+				},
+			}
+		}
+	}
+}
+
+func WithServing(ctx context.Context) Options {
+	return func(i *Impl) {
+		i.parse = func(obj interface{}, method string) interface{} {
+			ksvc, ok := obj.(*knV1.Service)
+			if !ok {
+				return obj
+			}
+
+			// if _, ok := pr.Labels["lowcode.faas"]; !ok {
+			// 	return nil
+			// }
+
+			return &event.Data{
+				// Method: method,
+				SvcStatusSummary: &event.SvcStatusSummary{
+					ObjectMeta: ksvc.ObjectMeta,
+					Status:     ksvc.Status,
 				},
 			}
 		}
@@ -89,6 +121,7 @@ type Impl struct {
 	cache    *lru.Cache
 	queue    *queue
 	parse    ParseOpt
+	bus      *bus.EventBus
 }
 
 func (i *Impl) AddFunc(obj interface{}) {
@@ -141,19 +174,3 @@ const (
 	UPDATE = "UPDATE"
 	DELETE = "DELETE"
 )
-
-type Object struct {
-	Method    string
-	FnSummary *FnStatusSummary
-	PRSummary *PRStatusSummary
-}
-
-type FnStatusSummary struct {
-	metav1.ObjectMeta
-	Status fnV1beta1.FunctionStatus
-}
-
-type PRStatusSummary struct {
-	metav1.ObjectMeta
-	Status prV1beta1.PipelineRunStatus
-}

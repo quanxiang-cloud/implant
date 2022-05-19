@@ -12,7 +12,7 @@ func NewControllerWithConfig(ctx context.Context, informer cache.SharedIndexInfo
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    impl.AddFunc,
 		UpdateFunc: impl.UpdateFunc,
-		DeleteFunc: impl.DeleteFunc,
+		// DeleteFunc: impl.DeleteFunc,
 	})
 
 	impl.informer = informer
